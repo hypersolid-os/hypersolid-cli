@@ -1,0 +1,43 @@
+{
+    "name": "hypersolid-cli",
+    "version": "1.2.0",
+    "package-monster": "0.7.0",
+    "description": "cli utility to manage hypersolid system images",
+    "license": "MPL-2.0",
+    "author": "Andi Dittrich <opensource@aenon-dynamics.com>",
+    "website": "https://github.com/hypersolid-os/hypersolid-cli",
+    "bugs": "https://github.com/hypersolid-os/hypersolid-cli/issues",
+    "multiversion": false,
+    "repository": "public",
+    "type": "script",
+
+    "debian": {
+
+        "section": "admin",
+        "priority": "optional",
+
+        "dependencies": [
+        ],
+
+        "conf": [
+        ],
+
+        "etc": [
+        ],
+
+        "sbin": [
+            "hypersolid"
+        ],
+
+        "files": [
+            {
+                "src": "lib/bash-functions",
+                "dst": "/usr/share/hypersolid-cli/bash-functions"
+            }
+        ],
+
+        "scripts": {
+        }
+    }
+
+}

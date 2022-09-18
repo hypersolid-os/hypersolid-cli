@@ -1,0 +1,181 @@
+#!/usr/bin/env bash
+
+# ----------------------------------------------------------------------
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# --
+# Copyright 2021-2022 Andi Dittrich <https://aenon-dynamics.com>
+# ----------------------------------------------------------------------
+
+_VERSION="1.2.0"
+_LICENSE="MPL-2.0"
+_REPOSITORY="https://github.com/hypersolid-os/hypersolid-cli"
+
+show_usage(){
+    cat << EOF
+Usage: hypersolid <command> [args...]
+
+Options:
+    -h,--help                               Displays this help
+    -v,--version                            Displays version
+
+Commands:
+    upgrade <path> [<partname>]             Upgrade system image using specified source directory
+
+EOF
+    exit 0
+}
+
+show_version(){
+    cat << EOF
+hypersolid-cli » v${_VERSION} » cli utility to manage hypersolid system images
+License: ${_LICENSE} https://opensource.org/licenses/${_LICENSE}
+Repository: ${_REPOSITORY}
+EOF
+    exit 0
+}
+
+# simple processing for help+versioning commands
+[ "$1" = "--help" ] || [ "$1" = "-h" ] || [ -z "$1" ] && show_usage
+[ "$1" = "--version" ] || [ "$1" = "-v" ] && show_version
+
+# fail on error
+set -e
+
+# load bash functions lib
+source /usr/share/hypersolid-cli/bash-functions
+
+# Exit on Error
+set -e
+
+# basedir
+BASEDIR="$( cd "$( dirname "$(realpath ${BASH_SOURCE[0]})" )" && pwd )"
+WORKINGDIR="$(pwd)"
+
+hy_upgrade(){
+
+    # upgrade dir provided ?
+    if [ -z "${1}" ]; then
+        panic "upgrade source path not defined"
+    fi
+
+    # upgrade dir
+    SOURCE_DIR="$(realpath ${1})"
+
+    # files found in current working dir ?
+    # -------------------------------------------
+    log_info "checking files in ${SOURCE_DIR}"
+
+    if [ -f "${SOURCE_DIR}/kernel.img" ]; then
+        log_info " - kernel.img found"
+    else
+        panic " ERROR - kernel.img not found"
+    fi
+
+    if [ -f "${SOURCE_DIR}/initramfs.img" ]; then
+        log_info " - initramfs.img found"
+    else
+        panic " ERROR - initramfs.img not found"
+    fi
+
+    if [ -f "${SOURCE_DIR}/system.img" ]; then
+        log_info " - system.img found"
+    else
+        panic " ERROR - system.img not found"
+    fi
+
+    # get mountpoints
+    # -------------------------------------------
+
+    # get paritions
+    BOOT_DEVICE=$(lsblk -o PATH,PARTLABEL | grep -E "\s+efiboot(\s|$)" | awk '{print $1}')
+    SYS0_DEVICE=$(lsblk -o PATH,PARTLABEL | grep -E "\s+system0(\s|$)" | awk '{print $1}')
+    SYS1_DEVICE=$(lsblk -o PATH,PARTLABEL | grep -E "\s+system1(\s|$)" | awk '{print $1}')
+
+    # sys0 mounted ?
+    if findmnt --source "${SYS0_DEVICE}" > /dev/null; then
+        log_info "system partition 0 currently in use - updating system1"
+        SYS_DEVICE=${SYS1_DEVICE}
+        SYS_DIR="sys1"
+    fi
+
+    # sys1 mounted ?
+    if findmnt --source "${SYS1_DEVICE}" > /dev/null; then
+        log_info "system partition 1 currently in use - updating system0"
+        SYS_DEVICE=${SYS0_DEVICE}
+        SYS_DIR="sys0"
+    fi
+
+    # sys device set ?
+    if [ -z "${SYS_DEVICE}" ] || [ -z "${SYS_DIR}" ]; then
+        # force update ?
+        if [ "${2}" == "sys0" ]; then
+            log_warning "system upgrade of sys0 enforced (no system mounted)"
+            SYS_DEVICE=${SYS0_DEVICE}
+            SYS_DIR="sys0"
+        elif [ "${2}" == "sys1" ]; then
+            log_warning "system upgrade of sys1 enforced (no system mounted)"
+            SYS_DEVICE=${SYS1_DEVICE}
+            SYS_DIR="sys1"
+        else
+            panic "ERROR - no system upgrade device detected nor enforced"
+        fi
+    fi
+
+    # create temp mountpoints for update and mount volumes
+    # -------------------------------------------
+    BOOTLOADER_PATH=/mnt/_upgrade/bootfs
+    SYSTEM_PATH=/mnt/_upgrade/sysfs
+    mkdir -p ${BOOTLOADER_PATH} ${SYSTEM_PATH}
+
+    # mount partitions
+    mount ${BOOT_DEVICE} ${BOOTLOADER_PATH}
+    mount ${SYS_DEVICE} ${SYSTEM_PATH}
+
+    # copy files
+    # -------------------------------------------
+    log_info "updating kernel"
+    cp ${SOURCE_DIR}/kernel.img ${BOOTLOADER_PATH}/${SYS_DIR} && log_success " > done"
+
+    log_info "updating initramfs"
+    cp ${SOURCE_DIR}/initramfs.img ${BOOTLOADER_PATH}/${SYS_DIR} && log_success " > done"
+    chmod 0400 ${BOOTLOADER_PATH}/${SYS_DIR}/*.img
+
+    log_info "updating system image"
+    cp ${SOURCE_DIR}/system.img ${SYSTEM_PATH}/system.img && log_success " > done"
+    chmod 0400 ${SYSTEM_PATH}/system.img
+
+    # set bootloader default image
+    # -------------------------------------------
+    if [ -f "${BOOTLOADER_PATH}/efi/boot/syslinux.cfg" ]; then
+        log_info "updating syslinux bootloader config [esp::/efi/boot/syslinux.cfg]"
+        sed -i "s/^\(DEFAULT linux-\).*$/\1${SYS_DIR}/" ${BOOTLOADER_PATH}/efi/boot/syslinux.cfg && log_success " > done"
+    fi
+    if [ -f "${BOOTLOADER_PATH}/syslinux.cfg" ]; then
+        log_info "updating syslinux bootloader config [esp::/syslinux.cfg]"
+        sed -i "s/^\(DEFAULT linux-\).*$/\1${SYS_DIR}/" ${BOOTLOADER_PATH}/syslinux.cfg && log_success " > done"
+    fi
+
+    # unmount
+    # -------------------------------------------
+    log_info "unmounting devices"
+    umount ${BOOTLOADER_PATH}
+    umount ${SYSTEM_PATH}
+
+    log_success " >> UPDATE COMPLETE <<"
+}
+
+# Command Dispatching
+# ---------------------------------------
+case "$1" in
+    upgrade)
+        hy_upgrade "$2" "$3"
+        exit 0
+    ;;
+
+    *)
+        show_usage
+        exit 1
+    ;;
+esac
