@@ -12,7 +12,7 @@ cli utility to manage hypersolid system images
 ## Usage ##
 
 ```
-Usage: hypersolid <command> [args...]
+Usage: hypersolid-cli <command> [args...]
 
 Options:
     -h,--help               Displays this help

@@ -8,13 +8,13 @@
 # Copyright 2021-2022 Andi Dittrich <https://aenon-dynamics.com>
 # ----------------------------------------------------------------------
 
-_VERSION="1.2.0"
+_VERSION="1.3.0"
 _LICENSE="MPL-2.0"
 _REPOSITORY="https://github.com/hypersolid-os/hypersolid-cli"
 
 show_usage(){
     cat << EOF
-Usage: hypersolid <command> [args...]
+Usage: hypersolid-cli <command> [args...]
 
 Options:
     -h,--help                               Displays this help
