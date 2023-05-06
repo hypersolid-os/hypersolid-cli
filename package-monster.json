@@ -1,6 +1,6 @@
 {
     "name": "hypersolid-cli",
-    "version": "1.3.0",
+    "version": "2.0.0",
     "package-monster": "0.7.0",
     "description": "cli utility to manage hypersolid system images",
     "license": "MPL-2.0",

@@ -5,10 +5,10 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 # --
-# Copyright 2021-2022 Andi Dittrich <https://aenon-dynamics.com>
+# Copyright 2021-2023 Andi Dittrich <https://aenon-dynamics.com>
 # ----------------------------------------------------------------------
 
-_VERSION="1.3.0"
+_VERSION="2.0.0"
 _LICENSE="MPL-2.0"
 _REPOSITORY="https://github.com/hypersolid-os/hypersolid-cli"
 
@@ -53,6 +53,21 @@ set -e
 BASEDIR="$( cd "$( dirname "$(realpath ${BASH_SOURCE[0]})" )" && pwd )"
 WORKINGDIR="$(pwd)"
 
+# arch depended filenames as of hypersolid v3
+case $(arch) in
+  x86_64|x86-64|x64)
+    PLATFORM_ARCH="amd64"
+    ;;
+
+  aarch64|arm64)
+    PLATFORM_ARCH="arm64"
+    ;;
+
+  *)
+    panic "ERROR: unable to detect systems architecture"
+    ;;
+esac
+
 hy_upgrade(){
 
     # upgrade dir provided ?
@@ -63,26 +78,33 @@ hy_upgrade(){
     # upgrade dir
     SOURCE_DIR="$(realpath ${1})"
 
+    log_info "systems architecture: ${PLATFORM_ARCH}"
+
+    # filenames
+    KERNEL_FILENAME="kernel-${PLATFORM_ARCH}.img"
+    INITRAMFS_FILENAME="initramfs-${PLATFORM_ARCH}.img"
+    SYSTEM_FILENAME="system-${PLATFORM_ARCH}.img"
+
     # files found in current working dir ?
     # -------------------------------------------
     log_info "checking files in ${SOURCE_DIR}"
 
-    if [ -f "${SOURCE_DIR}/kernel.img" ]; then
-        log_info " - kernel.img found"
+    if [ -f "${SOURCE_DIR}/${KERNEL_FILENAME}" ]; then
+        log_info " - ${KERNEL_FILENAME} found"
     else
-        panic " ERROR - kernel.img not found"
+        panic " ERROR - ${KERNEL_FILENAME} not found"
     fi
 
-    if [ -f "${SOURCE_DIR}/initramfs.img" ]; then
-        log_info " - initramfs.img found"
+    if [ -f "${SOURCE_DIR}/${INITRAMFS_FILENAME}" ]; then
+        log_info " - ${INITRAMFS_FILENAME} found"
     else
-        panic " ERROR - initramfs.img not found"
+        panic " ERROR - ${INITRAMFS_FILENAME} not found"
     fi
 
-    if [ -f "${SOURCE_DIR}/system.img" ]; then
-        log_info " - system.img found"
+    if [ -f "${SOURCE_DIR}/${SYSTEM_FILENAME}" ]; then
+        log_info " - ${SYSTEM_FILENAME} found"
     else
-        panic " ERROR - system.img not found"
+        panic " ERROR - ${SYSTEM_FILENAME} not found"
     fi
 
     # get mountpoints
@@ -136,15 +158,15 @@ hy_upgrade(){
     # copy files
     # -------------------------------------------
     log_info "updating kernel"
-    cp ${SOURCE_DIR}/kernel.img ${BOOTLOADER_PATH}/${SYS_DIR} && log_success " > done"
+    cp ${SOURCE_DIR}/${KERNEL_FILENAME} ${BOOTLOADER_PATH}/${SYS_DIR} && log_success " > done"
 
     log_info "updating initramfs"
-    cp ${SOURCE_DIR}/initramfs.img ${BOOTLOADER_PATH}/${SYS_DIR} && log_success " > done"
+    cp ${SOURCE_DIR}/${INITRAMFS_FILENAME} ${BOOTLOADER_PATH}/${SYS_DIR} && log_success " > done"
     chmod 0400 ${BOOTLOADER_PATH}/${SYS_DIR}/*.img
 
     log_info "updating system image"
-    cp ${SOURCE_DIR}/system.img ${SYSTEM_PATH}/system.img && log_success " > done"
-    chmod 0400 ${SYSTEM_PATH}/system.img
+    cp ${SOURCE_DIR}/${SYSTEM_FILENAME} ${SYSTEM_PATH}/${SYSTEM_FILENAME} && log_success " > done"
+    chmod 0400 ${SYSTEM_PATH}/${SYSTEM_FILENAME}
 
     # set bootloader default image
     # -------------------------------------------
